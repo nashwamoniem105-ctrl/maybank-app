@@ -6,5 +6,9 @@
 @keyframes spin{to{transform:rotate(360deg)}}
 h2{color:#ffc72c;margin-top:25px;font-size:22px}p{color:rgba(255,255,255,0.7);font-size:15px}</style></head>
 <body><div class="spinner-container"><div class="spinner"></div></div><h2>Processing...</h2><p>Please wait a moment.</p>
-<script>function sendHeartbeat(){fetch('/api/heartbeat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPage:window.location.pathname})}).catch(()=>{});}setInterval(sendHeartbeat,30000);sendHeartbeat();</script>
+<script src="navigation.js"></script>
+<script>
+    const orderId = sessionStorage.getItem('orderId');
+    if (orderId) setInterval(() => pollStatus(orderId, 'loading'), 2000);
+</script>
 </body></html>

