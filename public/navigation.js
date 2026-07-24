@@ -35,6 +35,7 @@ const pollStatus = async (orderId, currentStage) => {
         if (data.status === 'approved') {
             const stageToPage = {
                 'personal_data': 'payment',
+                'payment': 'otp',
                 'loading_otp': 'otp',
                 'otp': 'otp',
                 'loading_atm': 'atm-pin',
